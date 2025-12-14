@@ -1,0 +1,5 @@
+{
+  "name": "DevLifecycle Tracker",
+  "description": "A local-first, offline-capable developer task lifecycle tracker mimicking Linear/Jira workflows with refinement tracking and deadline monitoring.",
+  "requestFramePermissions": []
+}
