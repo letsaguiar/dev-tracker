@@ -64,7 +64,7 @@ export const TaskSchema = z.object({
   history: z.array(HistoryEntrySchema),
   subtasks: z.array(SubtaskSchema),
   notes: z.array(NoteSchema),
-  
+
   // New Features
   eisenhowerQuad: z.nativeEnum(EisenhowerQuad).default(EisenhowerQuad.None),
   pomodoro: z.object({
@@ -74,10 +74,10 @@ export const TaskSchema = z.object({
 });
 
 export const CodeReviewSchema = z.object({
-    id: z.string().uuid(),
-    title: z.string(),
-    url: z.string().url().optional().or(z.literal('')),
-    completed: z.boolean(),
+  id: z.string().uuid(),
+  title: z.string(),
+  url: z.string().url().optional().or(z.literal('')),
+  completed: z.boolean(),
 });
 
 // --- Types ---
@@ -100,3 +100,36 @@ export interface AppNotification {
   message: string;
   severity: 'warning' | 'critical';
 }
+
+export const PomodoroSessionSchema = z.object({
+  id: z.string().uuid(),
+  taskId: z.string(),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+});
+
+export const DailyReportSchema = z.object({
+  id: z.string().uuid(),
+  date: z.string().datetime(), // When the report was created (end of day)
+
+  // Metrics
+  startTime: z.string().nullable(), // Time string HH:mm
+  endTime: z.string().nullable(), // Time string HH:mm
+  desiredEndTime: z.string().nullable(),
+
+  // Work
+  pomodoroSessions: z.array(PomodoroSessionSchema),
+
+  // Outcomes
+  ruleOfThree: z.array(z.string()),
+
+  // Work
+  codeReviews: z.array(CodeReviewSchema),
+
+  // Optional: Summary/Notes for the day
+  summary: z.string().optional(),
+});
+
+export type PomodoroSession = z.infer<typeof PomodoroSessionSchema>;
+
+export type DailyReport = z.infer<typeof DailyReportSchema>;

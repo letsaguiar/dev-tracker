@@ -7,9 +7,9 @@ import { Button, Card, CardContent, Select } from './ui/Common';
 import { cn } from '../lib/utils';
 
 const PomodoroTimer: React.FC = () => {
-    const { pomodoroState, tickPomodoro, resetPomodoro, startPomodoro, pausePomodoro, setBreak, setPomodoroTask } = useDailyStore();
+    const { pomodoroState, tickPomodoro, resetPomodoro, startPomodoro, pausePomodoro, setBreak, setPomodoroTask, addPomodoroSession } = useDailyStore();
     const { incrementPomodoro, tasks } = useTaskStore();
-    
+
     const activeTasks = tasks.filter(t => t.status !== TaskStatus.Done);
 
     useEffect(() => {
@@ -23,6 +23,7 @@ const PomodoroTimer: React.FC = () => {
             pausePomodoro();
             if (!pomodoroState.isBreak && pomodoroState.currentTaskId) {
                 incrementPomodoro(pomodoroState.currentTaskId);
+                addPomodoroSession(pomodoroState.currentTaskId);
                 setBreak(true);
             } else if (pomodoroState.isBreak) {
                 setBreak(false); // Back to work
@@ -30,7 +31,7 @@ const PomodoroTimer: React.FC = () => {
         }
 
         return () => clearInterval(interval);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, tickPomodoro, pausePomodoro, pomodoroState.isBreak, pomodoroState.currentTaskId, incrementPomodoro, setBreak]);
+    }, [pomodoroState.isActive, pomodoroState.timeLeft, tickPomodoro, pausePomodoro, pomodoroState.isBreak, pomodoroState.currentTaskId, incrementPomodoro, setBreak, addPomodoroSession]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
@@ -44,13 +45,13 @@ const PomodoroTimer: React.FC = () => {
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     {pomodoroState.isBreak ? <><Coffee className="w-4 h-4" /> Break Time</> : <><Zap className="w-4 h-4" /> Focus Mode</>}
                 </div>
-                
+
                 <div className="text-5xl font-mono font-bold tabular-nums">
                     {formatTime(pomodoroState.timeLeft)}
                 </div>
 
                 <div className="w-full px-2">
-                    <Select 
+                    <Select
                         value={pomodoroState.currentTaskId || ""}
                         onChange={(e) => setPomodoroTask(e.target.value)}
                         disabled={pomodoroState.isActive}
@@ -67,11 +68,11 @@ const PomodoroTimer: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                     {!pomodoroState.isActive ? (
-                        <Button 
-                            size="sm" 
-                            className="w-24" 
+                        <Button
+                            size="sm"
+                            className="w-24"
                             onClick={() => {
-                                if(pomodoroState.currentTaskId || pomodoroState.isBreak) {
+                                if (pomodoroState.currentTaskId || pomodoroState.isBreak) {
                                     startPomodoro(pomodoroState.currentTaskId || '');
                                 }
                             }}
@@ -88,11 +89,11 @@ const PomodoroTimer: React.FC = () => {
                         <RotateCcw className="w-4 h-4" />
                     </Button>
                 </div>
-                
+
                 {/* Manual Mode Switch */}
                 <div className="flex gap-2 text-[10px] mt-2">
-                     <button onClick={() => setBreak(false)} className={cn("px-2 py-1 rounded", !pomodoroState.isBreak ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Work</button>
-                     <button onClick={() => setBreak(true)} className={cn("px-2 py-1 rounded", pomodoroState.isBreak ? "bg-green-600 text-white" : "text-muted-foreground hover:bg-accent")}>Break</button>
+                    <button onClick={() => setBreak(false)} className={cn("px-2 py-1 rounded", !pomodoroState.isBreak ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Work</button>
+                    <button onClick={() => setBreak(true)} className={cn("px-2 py-1 rounded", pomodoroState.isBreak ? "bg-green-600 text-white" : "text-muted-foreground hover:bg-accent")}>Break</button>
                 </div>
             </CardContent>
         </Card>

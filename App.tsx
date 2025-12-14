@@ -6,6 +6,7 @@ import TasksView from './components/TasksView';
 import TaskDetail from './components/TaskDetail';
 import CalendarView from './components/CalendarView';
 import MetricsView from './components/MetricsView';
+import ReportsPage from './components/ReportsPage';
 
 const App: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ const App: React.FC = () => {
           <Route path="tasks" element={<TasksView />} />
           <Route path="calendar" element={<CalendarView />} />
           <Route path="metrics" element={<MetricsView />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="task/:id" element={<TaskDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
