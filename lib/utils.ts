@@ -8,10 +8,13 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return '-';
+  // Use UTC timezone to ensure the date is displayed as stored (YYYY-MM-DD)
+  // without being shifted by local timezone offsets.
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   });
 }
 
@@ -28,23 +31,38 @@ export function getCompletionStatus(task: Task): CompletionStatus {
   if (task.status === TaskStatus.Done) return CompletionStatus.OnTrack;
   if (!task.dates.dueDate) return CompletionStatus.OnTrack;
 
-  const due = new Date(task.dates.dueDate).getTime();
-  const now = Date.now();
-  const dayInMillis = 24 * 60 * 60 * 1000;
+  // Normalize dates to "Day" granularity to avoid timezone confusion.
+  // We compare the "User's Local Today" vs "Task's Due Date (UTC)".
 
-  if (now > due) return CompletionStatus.Overdue;
-  if (now > due - (2 * dayInMillis)) return CompletionStatus.AtRisk; // Within 2 days
+  // 1. Get Due Date parts (stored as ISO UTC, e.g. "2025-12-16T00:00:00.000Z")
+  const dueStr = task.dates.dueDate;
+  const dueDatePart = dueStr.split('T')[0];
+  const dueTime = new Date(dueDatePart).getTime(); // UTC Midnight of Due Date
+
+  // 2. Get Today's Date parts in Local Time
+  const now = new Date();
+  const localYear = now.getFullYear();
+  const localMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const localDay = String(now.getDate()).padStart(2, '0');
+  const localDatePart = `${localYear}-${localMonth}-${localDay}`;
+  const todayTime = new Date(localDatePart).getTime(); // UTC Midnight of Local Date
+
+  const dayInMillis = 24 * 60 * 60 * 1000;
+  const diffDays = (dueTime - todayTime) / dayInMillis;
+
+  if (diffDays < 0) return CompletionStatus.Overdue;
+  if (diffDays <= 2) return CompletionStatus.AtRisk; // Due today, tomorrow, or day after
 
   return CompletionStatus.OnTrack;
 }
 
 export function getStatusColor(status: TaskStatus) {
-  switch(status) {
-      case TaskStatus.Done: return 'text-green-500';
-      case TaskStatus.InProgress: return 'text-blue-500';
-      case TaskStatus.Blocked: return 'text-red-500';
-      case TaskStatus.Waiting: return 'text-amber-500';
-      default: return 'text-muted-foreground';
+  switch (status) {
+    case TaskStatus.Done: return 'text-green-500';
+    case TaskStatus.InProgress: return 'text-blue-500';
+    case TaskStatus.Blocked: return 'text-red-500';
+    case TaskStatus.Waiting: return 'text-amber-500';
+    default: return 'text-muted-foreground';
   }
 }
 

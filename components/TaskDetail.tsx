@@ -124,7 +124,7 @@ const TaskDetail: React.FC = () => {
                                 <Input
                                     type="date"
                                     value={task.dates.startDate ? new Date(task.dates.startDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => handleDateUpdate('startDate', e.target.value)}
+                                    onChange={(e) => handleDateUpdate('startDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
                                 />
                             </div>
                             <div className="space-y-1">
@@ -132,7 +132,7 @@ const TaskDetail: React.FC = () => {
                                 <Input
                                     type="date"
                                     value={task.dates.dueDate ? new Date(task.dates.dueDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => handleDateUpdate('dueDate', e.target.value)}
+                                    onChange={(e) => handleDateUpdate('dueDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
                                 />
                             </div>
                             <div className="space-y-1">
@@ -140,7 +140,7 @@ const TaskDetail: React.FC = () => {
                                 <Input
                                     type="date"
                                     value={task.dates.completedDate ? new Date(task.dates.completedDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => handleDateUpdate('completedDate', e.target.value)}
+                                    onChange={(e) => handleDateUpdate('completedDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
                                     disabled={task.status !== TaskStatus.Done}
                                     className={task.status !== TaskStatus.Done ? "opacity-50 cursor-not-allowed" : ""}
                                 />
