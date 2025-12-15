@@ -183,10 +183,10 @@ const HomePage: React.FC = () => {
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[500px]">
+                <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-2 gap-4 h-auto md:h-[600px]">
                     {/* Q1: Do */}
                     <Card
-                        className="flex flex-col border-red-500/20 bg-red-500/5 transition-colors"
+                        className="flex flex-col h-full min-h-0 border-red-500/20 bg-red-500/5 transition-colors"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, EisenhowerQuad.Do)}
                     >
@@ -201,7 +201,7 @@ const HomePage: React.FC = () => {
 
                     {/* Q2: Decide */}
                     <Card
-                        className="flex flex-col border-blue-500/20 bg-blue-500/5 transition-colors"
+                        className="flex flex-col h-full min-h-0 border-blue-500/20 bg-blue-500/5 transition-colors"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, EisenhowerQuad.Decide)}
                     >
@@ -216,7 +216,7 @@ const HomePage: React.FC = () => {
 
                     {/* Q3: Delegate */}
                     <Card
-                        className="flex flex-col border-amber-500/20 bg-amber-500/5 transition-colors"
+                        className="flex flex-col h-full min-h-0 border-amber-500/20 bg-amber-500/5 transition-colors"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, EisenhowerQuad.Delegate)}
                     >
@@ -231,7 +231,7 @@ const HomePage: React.FC = () => {
 
                     {/* Q4: Delete */}
                     <Card
-                        className="flex flex-col border-border/50 bg-secondary/5 transition-colors"
+                        className="flex flex-col h-full min-h-0 border-border/50 bg-secondary/5 transition-colors"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, EisenhowerQuad.Delete)}
                     >

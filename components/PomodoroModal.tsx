@@ -5,7 +5,7 @@ import { useTaskStore } from '../store/useTaskStore';
 import { useDailyStore } from '../store/useDailyStore';
 import { Button, Card } from './ui/Common';
 import { cn } from '../lib/utils';
-import { playNotificationSound } from '../lib/sound';
+import { playNotificationSound, initAudio } from '../lib/sound';
 
 interface PomodoroModalProps {
     taskId: string;
@@ -94,6 +94,9 @@ const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
     };
 
     const toggleTimer = () => {
+        if (!isActive) {
+            initAudio();
+        }
         setIsActive(!isActive);
     };
 

@@ -1,9 +1,27 @@
-export const playNotificationSound = () => {
-    try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
+let audioContext: AudioContext | null = null;
 
-        const ctx = new AudioContext();
+export const initAudio = () => {
+    if (!audioContext) {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+            audioContext = new AudioContext();
+        }
+    }
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().catch(console.error);
+    }
+};
+
+export const playNotificationSound = () => {
+    // Fallback: try to init if it doesn't exist, though it might fail to auto-play if not warm.
+    if (!audioContext) {
+        initAudio();
+    }
+
+    if (!audioContext) return;
+
+    try {
+        const ctx = audioContext;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
