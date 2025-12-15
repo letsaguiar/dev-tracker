@@ -12,6 +12,7 @@ interface MarkdownEditorProps {
     placeholder?: string;
     className?: string;
     minHeight?: string;
+    defaultView?: 'write' | 'preview';
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -19,9 +20,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     onChange,
     placeholder,
     className,
-    minHeight = 'min-h-[100px]'
+    minHeight = 'min-h-[100px]',
+    defaultView = 'write'
 }) => {
-    const [view, setView] = useState<'write' | 'preview'>('write');
+    const [view, setView] = useState<'write' | 'preview'>(defaultView);
 
     return (
         <div className={cn("space-y-2 border rounded-md p-2 bg-card", className)}>

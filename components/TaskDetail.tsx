@@ -175,6 +175,7 @@ const TaskDetail: React.FC = () => {
                                             placeholder="What is the user value?"
                                             value={refinementGoal}
                                             onChange={(val) => handleLocalRefinementChange('goal', val)}
+                                            defaultView="preview"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -184,6 +185,7 @@ const TaskDetail: React.FC = () => {
                                             minHeight="min-h-[150px]"
                                             value={refinementAnalysis}
                                             onChange={(val) => handleLocalRefinementChange('technicalAnalysis', val)}
+                                            defaultView="preview"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -192,6 +194,7 @@ const TaskDetail: React.FC = () => {
                                             placeholder="Unit tests, edge cases, manual verification steps..."
                                             value={refinementStrategy}
                                             onChange={(val) => handleLocalRefinementChange('testingStrategy', val)}
+                                            defaultView="preview"
                                         />
                                     </div>
 
@@ -274,23 +277,25 @@ const TaskDetail: React.FC = () => {
                                 </div>
                             </div>
                             <div className="space-y-4 mt-4">
-                                {task.notes.map(note => (
-                                    <div key={note.id} className="bg-secondary/30 p-3 rounded-md text-sm">
-                                        <div className="prose prose-invert prose-sm max-w-none">
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    p: ({ node, ...props }) => <p className="mb-1 text-foreground" {...props} />,
-                                                    a: ({ node, ...props }) => <a className="text-blue-400 underline" {...props} />,
-                                                    code: ({ node, ...props }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props} />,
-                                                }}
-                                            >
-                                                {note.content}
-                                            </ReactMarkdown>
+                                {[...task.notes]
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map(note => (
+                                        <div key={note.id} className="bg-secondary/30 p-3 rounded-md text-sm">
+                                            <div className="prose prose-invert prose-sm max-w-none">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        p: ({ node, ...props }) => <p className="mb-1 text-foreground" {...props} />,
+                                                        a: ({ node, ...props }) => <a className="text-blue-400 underline" {...props} />,
+                                                        code: ({ node, ...props }) => <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props} />,
+                                                    }}
+                                                >
+                                                    {note.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground mt-2 text-right">{formatDateTime(note.createdAt)}</p>
                                         </div>
-                                        <p className="text-[10px] text-muted-foreground mt-2 text-right">{formatDateTime(note.createdAt)}</p>
-                                    </div>
-                                ))}
+                                    ))}
                             </div>
                         </CardContent>
                     </Card>
