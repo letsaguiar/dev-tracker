@@ -70,7 +70,8 @@ export const TaskSchema = z.object({
   pomodoro: z.object({
     estimated: z.number().default(0),
     actual: z.number().default(0),
-  }).default({ estimated: 0, actual: 0 }),
+    timeSpent: z.number().default(0), // Total seconds spent on this task
+  }).default({ estimated: 0, actual: 0, timeSpent: 0 }),
 });
 
 export const CodeReviewSchema = z.object({

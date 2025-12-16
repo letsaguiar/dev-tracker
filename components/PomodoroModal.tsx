@@ -1,128 +1,107 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Play, Pause, RotateCcw, Coffee, Zap, Check } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { X, Play, Pause, RotateCcw, Coffee, Zap } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTaskStore } from '../store/useTaskStore';
-import { useDailyStore } from '../store/useDailyStore';
+import { useTimerStore } from '../store/useTimerStore';
 import { Button, Card } from './ui/Common';
 import { cn } from '../lib/utils';
-import { playNotificationSound, initAudio } from '../lib/sound';
+import { initAudio } from '../lib/sound';
 
 interface PomodoroModalProps {
-    taskId: string;
+    taskId?: string; // Optional for Generic Mode
     onClose: () => void;
+    isGeneric?: boolean;
 }
 
 const WORK_TIME = 25 * 60;
 const SHORT_BREAK = 5 * 60;
 const LONG_BREAK_TIME = 15 * 60;
-const SESSIONS_BEFORE_LONG_BREAK = 4;
 
-const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
-    const task = useTaskStore(state => state.tasks.find(t => t.id === taskId));
-    const { incrementPomodoro } = useTaskStore();
-    const { addPomodoroSession } = useDailyStore();
+const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose, isGeneric }) => {
+    // Connect to Global Timer Store
+    const {
+        timeLeft,
+        isActive,
+        mode,
+        pomodoroCount,
+        activeTaskId,
+        startTimer,
+        pauseTimer,
+        resetTimer,
+        setMode
+    } = useTimerStore();
 
-    // Local state for the timer to avoid global store complexity for this isolated feature
-    // unless we want to persist it. For "run in background", Worker is key.
-    const [timeLeft, setTimeLeft] = useState(WORK_TIME);
-    const [isActive, setIsActive] = useState(false);
-    const [mode, setMode] = useState<'work' | 'shortBreak' | 'longBreak'>('work');
-    const [completedSessions, setCompletedSessions] = useState(0);
+    // Get task if exists
+    // If generic, task is undefined.
+    // If modal opened for a specific task but timer is running for another, 
+    // we should probably warn or show the running one? 
+    // The previous implementation assumed this modal IS the timer. 
+    // Now the timer is global.
 
-    // Worker Ref
-    const workerRef = useRef<Worker | null>(null);
+    // Logic: 
+    // If the global timer is active and activeTaskId !== taskId, 
+    // we are viewing a different task than the one running.
+    // This UX needs decision. For now, let's assume if you open this modal for Task B, 
+    // and Task A is running, we show Task A's timer? Or we switch?
+    // Let's assume we SWITCH context if not active. If active, we warn?
+    // For simplicity V1: If you open a modal, you are "Connecting" to the global timer.
+    // However, if the Timer is running for ANOTHER task, we should probably prompt user.
+    // But since we removed "Start" button from list if another is running (maybe?), 
+    // Let's just handle the current global state.
 
-    useEffect(() => {
-        // Initialize Worker
-        // Use BASE_URL to correctly locate the worker file when served from a subpath
-        // @ts-ignore
-        const baseUrl = import.meta.env.BASE_URL;
-        const workerPath = `${baseUrl}timer-worker.js`;
-        workerRef.current = new Worker(workerPath);
+    // If taskId is provided, we might want to start/Associate the timer with it if it's idle.
+    // Effectively: useEffect on mount -> if idle, set activeTaskId? No, let user click start.
 
-        workerRef.current.onerror = (err) => {
-            console.error("Worker Error:", err);
-        };
+    // We need to fetch the task object for display labels.
+    // Note: activeTaskId from store is the source of truth for "What is running".
+    // taskId prop is "What did I click on".
 
-        workerRef.current.onmessage = (e) => {
-            const { type, timeLeft: workerTimeLeft } = e.data;
-            if (type === 'TICK') {
-                setTimeLeft(workerTimeLeft);
-            } else if (type === 'COMPLETE') {
-                handleComplete();
-            }
-        };
+    const displayTaskId = activeTaskId || taskId;
+    const task = useTaskStore(state => state.tasks.find(t => t.id === displayTaskId));
 
-        return () => {
-            workerRef.current?.terminate();
-        };
-    }, []);
+    // Calculate time total for progress bar
+    const totalTime = mode === 'work' ? WORK_TIME : (mode === 'shortBreak' ? SHORT_BREAK : LONG_BREAK_TIME);
+    const percentage = ((totalTime - timeLeft) / totalTime) * 100;
 
-    // Sync Worker with State
-    useEffect(() => {
-        if (isActive) {
-            workerRef.current?.postMessage({ type: 'START', payload: { timeLeft } });
-        } else {
-            workerRef.current?.postMessage({ type: 'PAUSE' });
-        }
-    }, [isActive]); // Note: depend on isActive. For timeLeft, we only send initial current value on Start. 
-    // But if we pause, we need to ensure we resume correctly.
-    // The worker continues from where it was if we don't send new time, 
-    // BUT our worker implementation expects 'timeLeft' in payload for START.
-    // We should send current 'timeLeft' state when starting.
-
-    const handleComplete = () => {
-        setIsActive(false);
-        playNotificationSound();
-
-        if (mode === 'work') {
-            incrementPomodoro(taskId);
-            addPomodoroSession(taskId);
-            const newSessions = completedSessions + 1;
-            setCompletedSessions(newSessions);
-
-            // Auto-transition considerations? Or just stop and let user decide?
-            // "warning user it has been completed" -> Sound done.
-            // Suggest break.
-        }
-        // Notification API if permitted
-        if (Notification.permission === 'granted') {
-            new Notification("Timer Completed!", {
-                body: mode === 'work' ? "Focus session done. Take a break!" : "Break is over. Back to work!",
-            });
-        }
+    const handleClose = () => {
+        // We do NOT stop the timer on close anymore!
+        onClose();
     };
 
     const toggleTimer = () => {
         if (!isActive) {
             initAudio();
+            // If we are starting fresh (or resuming), ensuring we have the right task ID
+            // If currently idle, we start with the `taskId` prop (or null if generic).
+            // If currently active/paused, we resume.
+            // If we are paused on Task A, and clicked Task B... that's a switch.
+            // useTimerStore handles switching if we pass an ID.
+
+            // If generic mode is requested and we are idle:
+            if (isGeneric && !activeTaskId) {
+                startTimer(null);
+            } else if (taskId && activeTaskId !== taskId) {
+                // Switching tasks!
+                // Auto-reset timer for new task? or continue?
+                // Standard behavior: New Task = New Timer.
+                // We should probably reset if the ID changes.
+                // For now, `startTimer(taskId)` will update the ID. 
+                // Implied Reset needs to happen in Store or we do it here.
+                // Let's force reset if we switch tasks?
+                // Actually, let's just let startTimer handle it.
+                resetTimer(); // Reset time for new task
+                startTimer(taskId);
+            } else {
+                startTimer(); // Resume
+            }
+
+        } else {
+            pauseTimer();
         }
-        setIsActive(!isActive);
     };
 
-    const resetTimer = () => {
-        setIsActive(false);
-        const time = mode === 'work' ? WORK_TIME : (mode === 'shortBreak' ? SHORT_BREAK : LONG_BREAK_TIME);
-        setTimeLeft(time);
-        workerRef.current?.postMessage({ type: 'UPDATE_TIME', payload: { timeLeft: time } });
-    };
-
-    const switchMode = (newMode: 'work' | 'shortBreak' | 'longBreak') => {
-        setIsActive(false);
+    const handleModeSwitch = (newMode: 'work' | 'shortBreak' | 'longBreak') => {
         setMode(newMode);
-        let time = WORK_TIME;
-        if (newMode === 'shortBreak') time = SHORT_BREAK;
-        if (newMode === 'longBreak') time = LONG_BREAK_TIME;
-        setTimeLeft(time);
-        workerRef.current?.postMessage({ type: 'UPDATE_TIME', payload: { timeLeft: time } });
-    };
-
-    const handleClose = () => {
-        if (isActive) {
-            const confirm = window.confirm("Timer is running. Are you sure you want to leave?");
-            if (!confirm) return;
-        }
-        onClose();
     };
 
     const formatTime = (seconds: number) => {
@@ -131,20 +110,12 @@ const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    const percentage = mode === 'work'
-        ? ((WORK_TIME - timeLeft) / WORK_TIME) * 100
-        : mode === 'shortBreak'
-            ? ((SHORT_BREAK - timeLeft) / SHORT_BREAK) * 100
-            : ((LONG_BREAK_TIME - timeLeft) / LONG_BREAK_TIME) * 100;
-
-    if (!task) return null;
-
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
             <Card className="w-full max-w-md border-2 shadow-2xl relative overflow-hidden bg-card">
                 {/* Progress Bar Background */}
                 <div
-                    className="absolute bottom-0 left-0 h-1 bg-primary transition-all duration-1000"
+                    className="absolute bottom-0 left-0 h-1 bg-primary transition-all duration-1000 ease-linear"
                     style={{ width: `${percentage}%` }}
                 />
 
@@ -159,25 +130,27 @@ const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
 
                 <div className="p-8 flex flex-col items-center space-y-6 text-center">
                     <div className="space-y-2">
-                        <h2 className="text-2xl font-bold tracking-tight">{task.code}: {task.title}</h2>
+                        <h2 className="text-2xl font-bold tracking-tight">
+                            {task ? `${task.code}: ${task.title}` : (isGeneric ? "Free Flow Focus" : "Focus Mode")}
+                        </h2>
                         <div className="flex justify-center gap-2">
                             <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider",
-                                mode === 'work' ? "bg-primary/20 text-primary" : "text-muted-foreground")}>
+                                mode === 'work' ? "bg-primary/20 text-primary" : "text-muted-foreground opacity-50")}>
                                 Focus
                             </span>
                             <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider",
-                                mode === 'shortBreak' ? "bg-green-500/20 text-green-600" : "text-muted-foreground")}>
+                                mode === 'shortBreak' ? "bg-green-500/20 text-green-600" : "text-muted-foreground opacity-50")}>
                                 Short Break
                             </span>
                             <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider",
-                                mode === 'longBreak' ? "bg-blue-500/20 text-blue-600" : "text-muted-foreground")}>
+                                mode === 'longBreak' ? "bg-blue-500/20 text-blue-600" : "text-muted-foreground opacity-50")}>
                                 Long Break
                             </span>
                         </div>
                     </div>
 
                     <div className={cn("text-8xl font-mono font-black tracking-tighter tabular-nums select-none transition-colors",
-                        timeLeft < 60 && isActive ? "text-red-500" : "text-foreground"
+                        timeLeft < 60 && isActive && mode === 'work' ? "text-red-500" : "text-foreground"
                     )}>
                         {formatTime(timeLeft)}
                     </div>
@@ -185,7 +158,10 @@ const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
                     <div className="flex items-center gap-4">
                         <Button
                             size="lg"
-                            className="h-16 w-32 rounded-full text-lg font-bold shadow-lg shadow-primary/20"
+                            className={cn(
+                                "h-16 w-32 rounded-full text-lg font-bold shadow-lg transition-all",
+                                isActive ? "bg-primary/90 hover:bg-primary shadow-primary/20" : "bg-primary hover:bg-primary/90"
+                            )}
                             onClick={toggleTimer}
                         >
                             {isActive ? (
@@ -205,19 +181,23 @@ const PomodoroModal: React.FC<PomodoroModalProps> = ({ taskId, onClose }) => {
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 w-full pt-4 border-t">
-                        <Button variant="ghost" size="sm" onClick={() => switchMode('work')} className={mode === 'work' ? "bg-accent" : ""}>
+                        <Button variant="ghost" size="sm" onClick={() => handleModeSwitch('work')} className={mode === 'work' ? "bg-accent" : ""}>
                             <Zap className="w-3 h-3 mr-2" /> Focus
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => switchMode('shortBreak')} className={mode === 'shortBreak' ? "bg-accent" : ""}>
+                        <Button variant="ghost" size="sm" onClick={() => handleModeSwitch('shortBreak')} className={mode === 'shortBreak' ? "bg-accent" : ""}>
                             <Coffee className="w-3 h-3 mr-2" /> Short
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => switchMode('longBreak')} className={mode === 'longBreak' ? "bg-accent" : ""}>
+                        <Button variant="ghost" size="sm" onClick={() => handleModeSwitch('longBreak')} className={mode === 'longBreak' ? "bg-accent" : ""}>
                             <Coffee className="w-3 h-3 mr-2" /> Long
                         </Button>
                     </div>
 
                     <div className="text-xs text-muted-foreground">
-                        Sessions done: {task.pomodoro.actual} / {task.pomodoro.estimated} (This session: {completedSessions})
+                        {task ? (
+                            `Sessions done: ${task.pomodoro.actual} / ${task.pomodoro.estimated} (This run: ${pomodoroCount})`
+                        ) : (
+                            `Sessions done this run: ${pomodoroCount}`
+                        )}
                     </div>
                 </div>
             </Card>

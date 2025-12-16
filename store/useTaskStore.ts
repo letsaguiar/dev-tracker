@@ -13,6 +13,7 @@ interface TaskState {
   addSubtask: (taskId: string, title: string) => void;
   deleteSubtask: (taskId: string, subtaskId: string) => void;
   incrementPomodoro: (taskId: string) => void;
+  addTimeSpent: (taskId: string, seconds: number) => void;
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -36,23 +37,23 @@ export const useTaskStore = create<TaskState>()(
           subtasks: [],
           notes: [],
           eisenhowerQuad: EisenhowerQuad.None,
-          pomodoro: { estimated: 0, actual: 0 },
+          pomodoro: { estimated: 0, actual: 0, timeSpent: 0 },
         };
         return { tasks: [newTask, ...state.tasks] };
       }),
       updateTask: (id, updates) => set((state) => ({
         tasks: state.tasks.map((task) => {
           if (task.id !== id) return task;
-          
+
           const now = new Date().toISOString();
           let historyAction = 'Task updated';
-          
+
           if (updates.status && updates.status !== task.status) {
             historyAction = `Status changed to ${updates.status}`;
           }
 
           const newHistory: HistoryEntry = { timestamp: now, action: historyAction };
-          
+
           // Handle Completed Date Logic
           let completedDate = task.dates.completedDate;
           if (updates.status === TaskStatus.Done && task.status !== TaskStatus.Done) {
@@ -72,12 +73,12 @@ export const useTaskStore = create<TaskState>()(
               lastUpdated: now,
             },
             refinement: {
-                ...task.refinement,
-                ...(updates.refinement || {})
+              ...task.refinement,
+              ...(updates.refinement || {})
             },
             pomodoro: {
-                ...task.pomodoro,
-                ...(updates.pomodoro || {})
+              ...task.pomodoro,
+              ...(updates.pomodoro || {})
             },
             history: [newHistory, ...task.history],
           };
@@ -120,23 +121,36 @@ export const useTaskStore = create<TaskState>()(
       })),
       deleteSubtask: (taskId, subtaskId) => set((state) => ({
         tasks: state.tasks.map((t) => {
-            if (t.id !== taskId) return t;
-            return {
-                ...t,
-                subtasks: t.subtasks.filter(s => s.id !== subtaskId),
-                dates: { ...t.dates, lastUpdated: new Date().toISOString() }
-            };
+          if (t.id !== taskId) return t;
+          return {
+            ...t,
+            subtasks: t.subtasks.filter(s => s.id !== subtaskId),
+            dates: { ...t.dates, lastUpdated: new Date().toISOString() }
+          };
+        })
+      })),
+      addTimeSpent: (taskId, seconds) => set((state) => ({
+        tasks: state.tasks.map((t) => {
+          if (t.id !== taskId) return t;
+          return {
+            ...t,
+            pomodoro: {
+              ...t.pomodoro,
+              timeSpent: (t.pomodoro.timeSpent || 0) + seconds
+            },
+            // Note: We don't update lastUpdated here to avoid spamming history/sync for every second tick.
+          };
         })
       })),
       incrementPomodoro: (taskId) => set((state) => ({
-          tasks: state.tasks.map((t) => {
-              if (t.id !== taskId) return t;
-              return {
-                  ...t,
-                  pomodoro: { ...t.pomodoro, actual: t.pomodoro.actual + 1 },
-                  dates: { ...t.dates, lastUpdated: new Date().toISOString() }
-              };
-          })
+        tasks: state.tasks.map((t) => {
+          if (t.id !== taskId) return t;
+          return {
+            ...t,
+            pomodoro: { ...t.pomodoro, actual: t.pomodoro.actual + 1 },
+            dates: { ...t.dates, lastUpdated: new Date().toISOString() }
+          };
+        })
       }))
     }),
     {

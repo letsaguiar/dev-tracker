@@ -25,30 +25,15 @@ interface DailyState {
   deleteCodeReview: (id: string) => void;
 
   // Pomodoro
-  pomodoroState: {
-    isActive: boolean;
-    timeLeft: number; // in seconds
-    currentTaskId: string | null;
-    isBreak: boolean;
-    currentSessionCount?: number;
-    currentSessionStartTime?: string | null;
-  };
   pomodoroSessions: PomodoroSession[];
   addPomodoroSession: (taskId: string) => void;
-  setPomodoroTask: (taskId: string) => void;
-  startPomodoro: (taskId: string) => void;
-  pausePomodoro: () => void;
-  resetPomodoro: () => void;
-  tickPomodoro: () => void; // Called by interval
-  setBreak: (isBreak: boolean) => void;
 
   // History / Persistence
   history: DailyReport[];
   endDay: () => void;
 }
 
-const WORK_DURATION = 25 * 60;
-const BREAK_DURATION = 5 * 60;
+
 
 export const useDailyStore = create<DailyState>()(
   persist(
@@ -82,69 +67,13 @@ export const useDailyStore = create<DailyState>()(
 
       pomodoroSessions: [],
       addPomodoroSession: (taskId) => set(state => {
-        const startTime = state.pomodoroState.currentSessionStartTime || new Date().toISOString();
         return {
           pomodoroSessions: [...state.pomodoroSessions, {
             id: generateId(),
             taskId,
-            startTime,
+            startTime: new Date().toISOString(),
             endTime: new Date().toISOString(),
-          }],
-          pomodoroState: {
-            ...state.pomodoroState,
-            currentSessionStartTime: null
-          }
-        };
-      }),
-
-      pomodoroState: {
-        isActive: false,
-        timeLeft: WORK_DURATION,
-        currentTaskId: null,
-        isBreak: false,
-        currentSessionCount: 0,
-        currentSessionStartTime: null,
-      },
-      setPomodoroTask: (taskId) => set(state => ({
-        pomodoroState: { ...state.pomodoroState, currentTaskId: taskId }
-      })),
-      startPomodoro: (taskId) => set(state => {
-        const isNewSession = (state.pomodoroState.currentTaskId !== taskId && !state.pomodoroState.isBreak) || state.pomodoroState.timeLeft === WORK_DURATION;
-
-        return {
-          pomodoroState: {
-            ...state.pomodoroState,
-            isActive: true,
-            currentTaskId: taskId,
-            timeLeft: isNewSession ? WORK_DURATION : state.pomodoroState.timeLeft,
-            currentSessionStartTime: isNewSession ? new Date().toISOString() : state.pomodoroState.currentSessionStartTime
-          }
-        };
-      }),
-      pausePomodoro: () => set(state => ({
-        pomodoroState: { ...state.pomodoroState, isActive: false }
-      })),
-      resetPomodoro: () => set(state => ({
-        pomodoroState: {
-          ...state.pomodoroState,
-          isActive: false,
-          timeLeft: state.pomodoroState.isBreak ? BREAK_DURATION : WORK_DURATION,
-          currentSessionStartTime: null
-        }
-      })),
-      setBreak: (isBreak) => set(state => ({
-        pomodoroState: {
-          ...state.pomodoroState,
-          isBreak,
-          timeLeft: isBreak ? BREAK_DURATION : WORK_DURATION,
-          isActive: false
-        }
-      })),
-      tickPomodoro: () => set(state => {
-        const { timeLeft } = state.pomodoroState;
-        if (timeLeft <= 0) return state;
-        return {
-          pomodoroState: { ...state.pomodoroState, timeLeft: timeLeft - 1 }
+          }]
         };
       }),
 
@@ -203,11 +132,6 @@ export const useDailyStore = create<DailyState>()(
           todayGoals: [], // Clear Daily Focus
           codeReviews: pendingReviews,
           pomodoroSessions: [],
-          pomodoroState: {
-            ...state.pomodoroState,
-            currentSessionCount: 0,
-            currentSessionStartTime: null
-          }
         };
       })
     }),
