@@ -5,6 +5,7 @@ import { Play, Pause, Maximize2, X, Zap } from 'lucide-react';
 import { Button } from './ui/Common';
 import { cn } from '../lib/utils';
 import PomodoroModal from './PomodoroModal';
+import { initAudio } from '../lib/sound';
 
 const TimerWidget: React.FC = () => {
     const {

@@ -13,7 +13,7 @@ export const initAudio = () => {
 };
 
 export const playNotificationSound = () => {
-    // Fallback: try to init if it doesn't exist, though it might fail to auto-play if not warm.
+    // Fallback: try to init if it doesn't exist.
     if (!audioContext) {
         initAudio();
     }
@@ -22,21 +22,34 @@ export const playNotificationSound = () => {
 
     try {
         const ctx = audioContext;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        const now = ctx.currentTime;
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+        // Function to play a single beep
+        const playBeep = (startTime: number, duration: number, freqStart: number, freqEnd: number) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
-        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5); // Drop to A4
+            osc.connect(gain);
+            gain.connect(ctx.destination);
 
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freqStart, startTime);
+            osc.frequency.exponentialRampToValueAtTime(freqEnd, startTime + duration);
 
-        osc.start();
-        osc.stop(ctx.currentTime + 0.5);
+            // ADS Envelope
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        };
+
+        // Play three distinct beeps
+        playBeep(now, 0.4, 880, 440);
+        playBeep(now + 0.5, 0.4, 880, 440);
+        playBeep(now + 1.0, 0.6, 880, 440);
+
     } catch (error) {
         console.error("Failed to play notification sound", error);
     }
