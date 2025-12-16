@@ -19,6 +19,27 @@ const Layout: React.FC = () => {
     refreshNotifications(tasks);
   }, [tasks, refreshNotifications]);
 
+  // Check for stale session
+  useEffect(() => {
+    const checkStaleSession = () => {
+      const state = import('../store/useDailyStore').then(({ useDailyStore }) => {
+        const { currentDate, endDay } = useDailyStore.getState();
+        if (currentDate) {
+          const today = new Date().toISOString().split('T')[0];
+          if (currentDate !== today) {
+            if (window.confirm(`You have an unfinished session from ${currentDate}. Would you like to end it and save the report?`)) {
+              endDay();
+              window.location.reload();
+            }
+          }
+        }
+      });
+    };
+
+    // Small delay to ensure store is hydrated
+    setTimeout(checkStaleSession, 1000);
+  }, []);
+
   const navItems = [
     { path: '/', label: 'Overview', icon: LayoutDashboard },
     { path: '/tasks', label: 'Tasks', icon: CheckSquare },

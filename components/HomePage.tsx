@@ -120,7 +120,22 @@ const HomePage: React.FC = () => {
                             <label className="text-xs font-medium text-muted-foreground">Clock Out</label>
                             <div className="flex gap-2">
                                 <Input type="time" value={actualEndTime || ''} onChange={(e) => setActualEndTime(e.target.value)} />
-                                <Button size="icon" variant="outline" onClick={() => setActualEndTime(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}>
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    title="End Day & Save Report"
+                                    onClick={() => {
+                                        if (window.confirm("Are you sure you want to end the day? This will save the daily report and clear today's progress.")) {
+                                            if (!actualEndTime) {
+                                                setActualEndTime(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+                                            }
+                                            setTimeout(() => {
+                                                useDailyStore.getState().endDay();
+                                                window.location.reload(); // Refresh to ensure clean state
+                                            }, 100);
+                                        }
+                                    }}
+                                >
                                     <LogOut className="w-4 h-4" />
                                 </Button>
                             </div>

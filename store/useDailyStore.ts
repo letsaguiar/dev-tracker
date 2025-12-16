@@ -9,6 +9,7 @@ interface DailyState {
   startTime: string | null;
   desiredEndTime: string | null;
   actualEndTime: string | null;
+  currentDate: string | null; // Tracks the date of the current active session (YYYY-MM-DD)
   setStartTime: (time: string | null) => void;
   setDesiredEndTime: (time: string | null) => void;
   setActualEndTime: (time: string | null) => void;
@@ -41,7 +42,14 @@ export const useDailyStore = create<DailyState>()(
       startTime: null,
       desiredEndTime: null,
       actualEndTime: null,
-      setStartTime: (time) => set({ startTime: time }),
+      currentDate: null,
+      setStartTime: (time) => set(state => {
+        // If starting a new session and no date is set, set it to today
+        if (time && !state.currentDate) {
+          return { startTime: time, currentDate: new Date().toISOString().split('T')[0] };
+        }
+        return { startTime: time };
+      }),
       setDesiredEndTime: (time) => set({ desiredEndTime: time }),
       setActualEndTime: (time) => set({ actualEndTime: time }),
 
@@ -110,9 +118,14 @@ export const useDailyStore = create<DailyState>()(
           };
         });
 
+        // Use the session date for the report, or fallback to today if missing (legacy data)
+        const reportDate = state.currentDate
+          ? new Date(state.currentDate).toISOString()
+          : new Date().toISOString();
+
         const report: DailyReport = {
           id: generateId(),
-          date: new Date().toISOString(),
+          date: reportDate,
           startTime: state.startTime,
           endTime: state.actualEndTime || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
           desiredEndTime: state.desiredEndTime || null,
@@ -129,6 +142,7 @@ export const useDailyStore = create<DailyState>()(
           startTime: null,
           desiredEndTime: null,
           actualEndTime: null,
+          currentDate: null, // Reset session date
           todayGoals: [], // Clear Daily Focus
           codeReviews: pendingReviews,
           pomodoroSessions: [],
