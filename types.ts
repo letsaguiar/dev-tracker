@@ -108,6 +108,14 @@ export const PomodoroSessionSchema = z.object({
   endTime: z.string().datetime(),
 });
 
+export const DailySnapshotSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  type: z.enum(['task', 'subtask']),
+  title: z.string(),
+  completed: z.boolean(),
+});
+
 export const DailyReportSchema = z.object({
   id: z.string().uuid(),
   date: z.string().datetime(), // When the report was created (end of day)
@@ -118,10 +126,11 @@ export const DailyReportSchema = z.object({
   desiredEndTime: z.string().nullable(),
 
   // Work
+  goals: z.array(DailySnapshotSchema),
   pomodoroSessions: z.array(PomodoroSessionSchema),
 
   // Outcomes
-  ruleOfThree: z.array(z.string()),
+  ruleOfThree: z.array(z.string()).optional(), // Deprecated but kept for history
 
   // Work
   codeReviews: z.array(CodeReviewSchema),
@@ -131,5 +140,14 @@ export const DailyReportSchema = z.object({
 });
 
 export type PomodoroSession = z.infer<typeof PomodoroSessionSchema>;
-
 export type DailyReport = z.infer<typeof DailyReportSchema>;
+export type DailySnapshot = z.infer<typeof DailySnapshotSchema>;
+
+// Store Types
+export type DailyGoalType = 'task' | 'subtask';
+
+export interface DailyGoal {
+  id: string; // The ID of the task or subtask itself
+  taskId: string; // The parent ID (if it is a task, this equals id)
+  type: DailyGoalType;
+}

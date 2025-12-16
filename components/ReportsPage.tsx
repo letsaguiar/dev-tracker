@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDailyStore } from '../store/useDailyStore';
+import { useTaskStore } from '../store/useTaskStore';
 import { Card, CardHeader, CardTitle, CardContent, Input, Button } from './ui/Common';
-import { FileDown, Calendar as CalendarIcon, Clock, CheckCircle, List, FileType } from 'lucide-react';
-import { DailyReport } from '../types';
+import { FileDown, Calendar as CalendarIcon, Clock, CheckCircle, List, FileType, Star } from 'lucide-react';
+import { DailyReport, DailySnapshot } from '../types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { cn } from '../lib/utils';
 
 const ReportsPage: React.FC = () => {
-    const { history, startTime, actualEndTime, ruleOfThree, codeReviews, pomodoroSessions } = useDailyStore();
+    const { history, startTime, actualEndTime, codeReviews, pomodoroSessions, todayGoals } = useDailyStore();
+    const { tasks } = useTaskStore();
+
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
@@ -18,13 +22,41 @@ const ReportsPage: React.FC = () => {
 
     // 1. Construct Today's Report (Dynamic)
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Hydrate goals for display
+    const currentGoalsSnapshot: DailySnapshot[] = todayGoals.map(goal => {
+        const task = tasks.find(t => t.id === goal.taskId);
+        let title = 'Unknown Task';
+        let completed = false;
+
+        if (task) {
+            if (goal.type === 'task') {
+                title = task.title;
+                completed = task.status === 'Done';
+            } else {
+                const sub = task.subtasks.find(s => s.id === goal.id);
+                if (sub) {
+                    title = sub.title + ` (via ${task.title})`;
+                    completed = sub.completed;
+                }
+            }
+        }
+        return {
+            id: goal.id,
+            taskId: goal.taskId,
+            type: goal.type,
+            title,
+            completed
+        };
+    });
+
     const todayReport: DailyReport = {
         id: 'current',
         date: new Date().toISOString(),
         startTime,
         endTime: actualEndTime || 'In Progress', // Show status if not clocked out
         desiredEndTime: null,
-        ruleOfThree,
+        goals: currentGoalsSnapshot,
         codeReviews: codeReviews.filter(cr => cr.completed),
         pomodoroSessions,
         summary: '',
@@ -217,27 +249,59 @@ const ReportDetailView: React.FC<{ report: DailyReport, isPrint?: boolean }> = (
                 </Card>
             </div>
 
-            <Card className={isPrint ? "border shadow-none" : ""}>
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-primary" /> Rule of 3 Outcomes
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ul className="space-y-3">
-                        {report.ruleOfThree && report.ruleOfThree.map((rule, idx) => (
-                            <li key={idx} className="flex gap-3 items-start">
-                                <span className="bg-secondary text-secondary-foreground font-mono text-xs w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                                    #{idx + 1}
-                                </span>
-                                <span className={rule ? "text-foreground" : "text-muted-foreground italic"}>
-                                    {rule || "No outcome set"}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </CardContent>
-            </Card>
+            {/* Goals Section (Replaces Rule of 3) */}
+            {(report.goals && report.goals.length > 0) && (
+                <Card className={isPrint ? "border shadow-none" : ""}>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Star className="w-5 h-5 text-primary" /> Daily Goals
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            {report.goals.map((goal) => (
+                                <div key={goal.id} className="flex items-center justify-between p-2 rounded border bg-secondary/10">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        {goal.completed ?
+                                            <CheckCircle className="w-4 h-4 text-green-600" /> :
+                                            <div className="w-4 h-4 rounded-full border border-muted-foreground" />
+                                        }
+                                        <span className={cn("text-sm truncate", goal.completed && "line-through text-muted-foreground")}>
+                                            {goal.title}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs font-mono text-muted-foreground uppercase">{goal.type}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Legacy Rule of 3 Support */}
+            {(!report.goals || report.goals.length === 0) && report.ruleOfThree && report.ruleOfThree.some(r => r) && (
+                <Card className={isPrint ? "border shadow-none" : ""}>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-primary" /> Rule of 3 Outcomes (Legacy)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ul className="space-y-3">
+                            {report.ruleOfThree.map((rule, idx) => (
+                                <li key={idx} className="flex gap-3 items-start">
+                                    <span className="bg-secondary text-secondary-foreground font-mono text-xs w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                                        #{idx + 1}
+                                    </span>
+                                    <span className={rule ? "text-foreground" : "text-muted-foreground italic"}>
+                                        {rule || "No outcome set"}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </Card>
+            )}
 
             <Card className={isPrint ? "border shadow-none" : ""}>
                 <CardHeader>

@@ -4,23 +4,25 @@ import { useDailyStore } from '../store/useDailyStore';
 import { Link } from 'react-router-dom';
 import {
     Briefcase, LogOut, ExternalLink, Star, Plus, CheckSquare, Square,
-    ArrowRight, Activity
+    ArrowRight, Activity, Trash2, CheckCircle2, Circle
 } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Select } from './ui/Common';
 import { TaskStatus, EisenhowerQuad, Task } from '../types';
 import { cn, getStatusColor } from '../lib/utils';
 import InProgressTasks from './InProgressTasks';
+import DailyGoalPicker from './DailyGoalPicker';
 
 const HomePage: React.FC = () => {
-    const { tasks, updateTask } = useTaskStore();
+    const { tasks, updateTask, toggleSubtask } = useTaskStore();
     const {
         startTime, desiredEndTime, actualEndTime, setStartTime, setDesiredEndTime, setActualEndTime,
         codeReviews, addCodeReview, toggleCodeReview, deleteCodeReview,
-        ruleOfThree, updateRuleOfThree
+        todayGoals, removeGoal
     } = useDailyStore();
 
     const [newCRTitle, setNewCRTitle] = useState('');
     const [newCRUrl, setNewCRUrl] = useState('');
+    const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
 
     const activeTasks = tasks.filter(t => t.status !== TaskStatus.Done);
     const getTasksByQuad = (quad: EisenhowerQuad) => activeTasks.filter(t => t.eisenhowerQuad === quad);
@@ -68,6 +70,33 @@ const HomePage: React.FC = () => {
         </div>
     );
 
+    const resolveGoal = (goal: { id: string, taskId: string, type: 'task' | 'subtask' }) => {
+        const task = tasks.find(t => t.id === goal.taskId);
+        if (!task) return null;
+
+        if (goal.type === 'task') {
+            return {
+                title: task.title,
+                completed: task.status === TaskStatus.Done,
+                code: task.code,
+                isSubtask: false,
+                toggle: () => updateTask(task.id, { status: task.status === TaskStatus.Done ? TaskStatus.Todo : TaskStatus.Done }),
+                parentTitle: null
+            };
+        } else {
+            const subtask = task.subtasks.find(s => s.id === goal.id);
+            if (!subtask) return null;
+            return {
+                title: subtask.title,
+                completed: subtask.completed,
+                code: task.code,
+                isSubtask: true,
+                toggle: () => toggleSubtask(task.id, subtask.id),
+                parentTitle: task.title
+            };
+        }
+    };
+
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-12">
             {/* Top Row: Activity */}
@@ -100,37 +129,71 @@ const HomePage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {/* Row 2: Priorities (Rule of 3 & CRs) */}
+            {/* Row 2: Priorities (Daily Focus & CRs) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-yellow-500">
-                            <Star className="w-5 h-5 fill-current" /> Rule of 3
+                <Card className="flex flex-col h-full">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="flex items-center gap-2 text-primary">
+                            <Star className="w-5 h-5 fill-current" /> Today's Focus
                         </CardTitle>
+                        <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsGoalPickerOpen(true)}>
+                            <Plus className="w-3 h-3" /> Add Goal
+                        </Button>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">What are the 3 outcomes you commit to delivering today?</p>
-                        {[0, 1, 2].map(idx => (
-                            <div key={idx} className="flex items-center gap-3">
-                                <span className="font-mono text-muted-foreground text-sm font-bold">#{idx + 1}</span>
-                                <Input
-                                    value={ruleOfThree[idx]}
-                                    onChange={(e) => updateRuleOfThree(idx, e.target.value)}
-                                    placeholder={idx === 0 ? "Most important outcome..." : "Secondary outcome..."}
-                                    className="flex-1"
-                                />
-                            </div>
-                        ))}
+                    <CardContent className="space-y-3 flex-1">
+                        <p className="text-sm text-muted-foreground">Select tasks or subtasks to focus on today.</p>
+
+                        <div className="space-y-2">
+                            {todayGoals.map((goal, idx) => {
+                                const details = resolveGoal(goal);
+                                if (!details) return null; // Task deleted?
+
+                                return (
+                                    <div key={goal.id} className="flex items-center gap-3 p-2 border rounded-md bg-card hover:bg-muted/30 transition-colors group">
+                                        <button onClick={details.toggle} className="mt-0.5 text-muted-foreground hover:text-primary transition-colors">
+                                            {details.completed ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Circle className="w-5 h-5" />}
+                                        </button>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className={cn("text-sm font-medium truncate flex items-center gap-2", details.completed && "line-through text-muted-foreground")}>
+                                                <span className="text-xs font-mono text-muted-foreground">{details.code}</span>
+                                                {details.title}
+                                            </div>
+                                            {details.isSubtask && (
+                                                <div className="text-xs text-muted-foreground truncate">
+                                                    ↳ {details.parentTitle}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={() => removeGoal(goal.id)}
+                                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-opacity"
+                                            title="Remove from Today's Focus"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            {todayGoals.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed rounded-lg text-muted-foreground text-sm">
+                                    No goals selected for today.
+                                    <br />
+                                    <Button variant="link" onClick={() => setIsGoalPickerOpen(true)}>Pick from Backlog</Button>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="flex flex-col h-full">
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2">
                             <ExternalLink className="w-5 h-5" /> Pending Code Reviews
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 flex-1">
                         <form onSubmit={handleAddCR} className="flex gap-2">
                             <div className="flex-1 space-y-2">
                                 <Input
@@ -173,6 +236,8 @@ const HomePage: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            <DailyGoalPicker open={isGoalPickerOpen} onOpenChange={setIsGoalPickerOpen} />
 
             {/* Row 3: Eisenhower Matrix */}
             <div className="space-y-4">
