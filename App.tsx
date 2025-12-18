@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import HomePage from './components/HomePage';
@@ -7,8 +7,21 @@ import TaskDetail from './components/TaskDetail';
 import CalendarView from './components/CalendarView';
 import MetricsView from './components/MetricsView';
 import ReportsPage from './components/ReportsPage';
+import { useDailyStore } from './store/useDailyStore';
 
 const App: React.FC = () => {
+  const { currentDate, startDay } = useDailyStore();
+
+  useEffect(() => {
+    // Check if we need to start a new day
+    if (currentDate) {
+      const today = new Date().toISOString().split('T')[0];
+      if (currentDate !== today) {
+        startDay();
+      }
+    }
+  }, [currentDate, startDay]);
+
   return (
     <HashRouter>
       <Routes>

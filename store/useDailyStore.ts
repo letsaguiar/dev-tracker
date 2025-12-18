@@ -9,7 +9,7 @@ interface DailyState {
   startTime: string | null;
   desiredEndTime: string | null;
   actualEndTime: string | null;
-  currentDate: string | null; // Tracks the date of the current active session (YYYY-MM-DD)
+  currentDate: string | null;
   setStartTime: (time: string | null) => void;
   setDesiredEndTime: (time: string | null) => void;
   setActualEndTime: (time: string | null) => void;
@@ -32,6 +32,7 @@ interface DailyState {
   // History / Persistence
   history: DailyReport[];
   endDay: () => void;
+  startDay: () => void;
 }
 
 
@@ -87,7 +88,7 @@ export const useDailyStore = create<DailyState>()(
 
       history: [],
       endDay: () => set(state => {
-        // Hydrate goals from task store
+        // Hydrate goals from task store - Logic shared with startDay
         const taskState = useTaskStore.getState();
         const allTasks = taskState.tasks;
 
@@ -147,7 +148,92 @@ export const useDailyStore = create<DailyState>()(
           codeReviews: pendingReviews,
           pomodoroSessions: [],
         };
-      })
+      }),
+
+      startDay: () => {
+        // startDay essentially performs the cleanup and persistence of the previous day
+        // ensuring the user starts fresh. It calls the internal state setter logic similar to endDay.
+        // We can actually reuse the logic or just implement it here.
+        // For clarity and independence, I'll allow it to trigger the same "cleanup" logic.
+        // If endDay was called, state is already clean.
+        // If not, this saves the previous session.
+
+        set(state => {
+          // If there is no active session (no start time/current date), just ensure clean state
+          if (!state.currentDate && !state.startTime) {
+            return {
+              startTime: null,
+              desiredEndTime: null,
+              actualEndTime: null,
+              currentDate: null,
+              todayGoals: [],
+              pomodoroSessions: [],
+              // codeReviews are not cleared if no session active (just safe default)
+            };
+          }
+
+          // Hydrate goals from task store
+          const taskState = useTaskStore.getState();
+          const allTasks = taskState.tasks;
+
+          const snapshots: DailySnapshot[] = state.todayGoals.map(goal => {
+            const task = allTasks.find(t => t.id === goal.taskId);
+            let isCompleted = false;
+            let title = 'Unknown Task';
+
+            if (task) {
+              if (goal.type === 'task') {
+                isCompleted = task.status === 'Done';
+                title = task.title;
+              } else {
+                const subtask = task.subtasks.find(s => s.id === goal.id);
+                if (subtask) {
+                  isCompleted = subtask.completed;
+                  title = subtask.title + ` (via ${task.title})`;
+                }
+              }
+            }
+
+            return {
+              id: goal.id,
+              taskId: goal.taskId,
+              type: goal.type,
+              title,
+              completed: isCompleted
+            };
+          });
+
+          // Use the session date for the report
+          const reportDate = state.currentDate
+            ? new Date(state.currentDate).toISOString()
+            : new Date().toISOString();
+
+          const report: DailyReport = {
+            id: generateId(),
+            date: reportDate,
+            startTime: state.startTime,
+            endTime: state.actualEndTime || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            desiredEndTime: state.desiredEndTime || null,
+            goals: snapshots,
+            codeReviews: state.codeReviews.filter(cr => cr.completed),
+            pomodoroSessions: state.pomodoroSessions,
+            summary: '',
+          };
+
+          const pendingReviews = state.codeReviews.filter(cr => !cr.completed);
+
+          return {
+            history: [report, ...state.history],
+            startTime: null,
+            desiredEndTime: null,
+            actualEndTime: null,
+            currentDate: null, // Ready for new day
+            todayGoals: [],
+            codeReviews: pendingReviews,
+            pomodoroSessions: [],
+          };
+        })
+      }
     }),
     {
       name: 'dev-daily-storage',
