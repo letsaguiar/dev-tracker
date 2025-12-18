@@ -33,6 +33,8 @@ interface DailyState {
   history: DailyReport[];
   endDay: () => void;
   startDay: () => void;
+  isDayReviewNeeded: boolean;
+  setDayReviewNeeded: (needed: boolean) => void;
 }
 
 
@@ -233,7 +235,9 @@ export const useDailyStore = create<DailyState>()(
             pomodoroSessions: [],
           };
         })
-      }
+      },
+      setDayReviewNeeded: (needed) => set({ isDayReviewNeeded: needed }),
+      isDayReviewNeeded: false,
     }),
     {
       name: 'dev-daily-storage',
