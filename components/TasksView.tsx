@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { useTaskStore } from '../store/useTaskStore';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button, Input, Card, Select, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from './ui/Common';
 import { TaskStatus, CompletionStatus, EisenhowerQuad, Task } from '../types';
 import { cn, getCompletionStatus, formatDate, getStatusColor } from '../lib/utils';
+import { isBefore, isAfter, isSameDay, startOfWeek, endOfWeek, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const TasksView: React.FC = () => {
     const { tasks, addTask } = useTaskStore();
-    const [filter, setFilter] = useState<'All' | 'Active' | 'Done'>('Active');
+    const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Todo' | 'In-Progress' | 'Waiting' | 'Blocked' | 'Done'>('Active');
+    const [dueDateFilter, setDueDateFilter] = useState<'All' | 'Overdue' | 'Today' | 'This Week' | 'Later' | 'No Date'>('All');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [search, setSearch] = useState('');
 
     // Creation Modal State
@@ -18,10 +21,59 @@ const TasksView: React.FC = () => {
     const [newTitle, setNewTitle] = useState('');
 
     const filteredTasks = tasks.filter(task => {
-        if (filter === 'Active' && task.status === TaskStatus.Done) return false;
-        if (filter === 'Done' && task.status !== TaskStatus.Done) return false;
+        // Status Filter
+        if (statusFilter === 'Active') {
+            if (task.status === TaskStatus.Done) return false;
+        } else if (statusFilter === 'Done') {
+            if (task.status !== TaskStatus.Done) return false;
+        } else if (statusFilter !== 'All') {
+            if (task.status !== statusFilter) return false;
+        }
+
+        // Due Date Filter
+        if (dueDateFilter !== 'All') {
+            if (dueDateFilter === 'No Date') {
+                if (task.dates.dueDate) return false;
+            } else {
+                if (!task.dates.dueDate) return false;
+
+                // Normalize dates to ensure we compare "Visual Date" vs "Local Today"
+                const taskDateStr = task.dates.dueDate.split('T')[0];
+                const taskDate = parseISO(taskDateStr); // parsed as Local Midnight of that date
+
+                const now = new Date();
+                const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD Local
+                const today = parseISO(todayStr); // Local Midnight of today
+
+                if (dueDateFilter === 'Overdue') {
+                    if (!isBefore(taskDate, today)) return false;
+                } else if (dueDateFilter === 'Today') {
+                    if (!isSameDay(taskDate, today)) return false;
+                } else if (dueDateFilter === 'This Week') {
+                    const start = startOfWeek(today, { weekStartsOn: 1 });
+                    const end = endOfWeek(today, { weekStartsOn: 1 });
+                    if (isBefore(taskDate, start) || isAfter(taskDate, end)) return false;
+                } else if (dueDateFilter === 'Later') {
+                    const end = endOfWeek(today, { weekStartsOn: 1 });
+                    if (!isAfter(taskDate, end)) return false;
+                }
+            }
+        }
+
+        // Search Filter
         if (search && !task.title.toLowerCase().includes(search.toLowerCase()) && !task.code.toLowerCase().includes(search.toLowerCase())) return false;
+
         return true;
+    }).sort((a, b) => {
+        // Always push tasks without due date to the bottom, regardless of sort order
+        if (!a.dates.dueDate && !b.dates.dueDate) return 0;
+        if (!a.dates.dueDate) return 1;
+        if (!b.dates.dueDate) return -1;
+
+        const dateA = new Date(a.dates.dueDate).getTime();
+        const dateB = new Date(b.dates.dueDate).getTime();
+
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
     const handleCreateTask = (e: React.FormEvent) => {
@@ -77,14 +129,42 @@ const TasksView: React.FC = () => {
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Filter className="w-4 h-4 text-muted-foreground" />
                         <Select
-                            value={filter}
-                            onChange={(e) => setFilter(e.target.value as any)}
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
                             className="h-8 w-32"
                         >
-                            <option value="All">All Tasks</option>
+                            <option value="All">All Status</option>
                             <option value="Active">Active</option>
+                            <option value="Todo">To Do</option>
+                            <option value="In-Progress">In Progress</option>
+                            <option value="Waiting">Waiting</option>
+                            <option value="Blocked">Blocked</option>
                             <option value="Done">Completed</option>
                         </Select>
+
+                        <Calendar className="w-4 h-4 text-muted-foreground ml-2" />
+                        <Select
+                            value={dueDateFilter}
+                            onChange={(e) => setDueDateFilter(e.target.value as any)}
+                            className="h-8 w-32"
+                        >
+                            <option value="All">All Dates</option>
+                            <option value="Overdue">Overdue</option>
+                            <option value="Today">Today</option>
+                            <option value="This Week">This Week</option>
+                            <option value="Later">Later</option>
+                            <option value="No Date">No Date</option>
+                        </Select>
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 ml-1"
+                            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            title={`Sort by Due Date ${sortOrder === 'asc' ? '(Ascending)' : '(Descending)'}`}
+                        >
+                            {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                        </Button>
                     </div>
                 </div>
                 <div className="divide-y divide-border">
